@@ -7,7 +7,7 @@ dependencies:
   - beautifulsoup4
   - lxml
   - pandas
-  - nltk
+  - textblob
   - matplotlib
   - wordcloud
   - ipykernel

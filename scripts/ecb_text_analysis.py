@@ -6,9 +6,12 @@ import re
 # basically: search, match, and manipulate text in smart ways
 import requests
 # requests = a tool that lets Python access the internet like a browser.
+import pandas as pd
+# pandas = a library for working with data, especially tables (like Excel spreadsheets).
 from bs4 import BeautifulSoup
 # Take a tool called BeautifulSoup from a library called bs4
 # BeautifulSoup = a tool that helps you read and extract data from websites easily
+from textblob import TextBlob
 
 # Store the webpage address in a variable called URL
 URL = "https://www.ecb.europa.eu/press/press_conference/monetary-policy-statement/2025/html/ecb.is250605~f00a36ef2b.en.html"

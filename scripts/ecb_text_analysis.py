@@ -1,6 +1,8 @@
 from pathlib import Path
 # pathlib is a built-in Python module that helps you work with file paths, like where files and folders are on your computer.
 # Path = a class in pathlib module, the main tool you actually use.
+from collections import Counter
+# Counter helps to count how many times each item appears in a list or collection.
 import re
 # a Python module for working with text patterns, called regular expressions.
 # basically: search, match, and manipulate text in smart ways
@@ -8,10 +10,13 @@ import requests
 # requests = a tool that lets Python access the internet like a browser.
 import pandas as pd
 # pandas = a library for working with data, especially tables (like Excel spreadsheets).
+import matplotlib.pyplot as plt
+# matplotlib.pyplot = a tool for making graphs and charts in Python.
 from bs4 import BeautifulSoup
 # Take a tool called BeautifulSoup from a library called bs4
 # BeautifulSoup = a tool that helps you read and extract data from websites easily
 from textblob import TextBlob
+from wordcloud import STOPWORDS, WordCloud
 
 # Store the webpage address in a variable called URL
 URL = "https://www.ecb.europa.eu/press/press_conference/monetary-policy-statement/2025/html/ecb.is250605~f00a36ef2b.en.html"
@@ -24,15 +29,38 @@ OUTPUT_DIR = Path("outputs")
 DATA_DIR.mkdir(exist_ok=True)
 OUTPUT_DIR.mkdir(exist_ok=True)
 
-# Cleaning messy text
+# Defining functions.
+# 1. Cleaning messy text
 def clean_whitespace(text: str) -> str:
     # HTML text can contain extra spaces, tabs, and line breaks.
     # This function turns repeated whitespace into a single clean space.
     return re.sub(r"\s+", " ", text).strip() # \s means whitespace, + means “one or more”
+# 2. converts numbers into words for sentiment analysis
+def sentiment_label(polarity: float) -> str:
+    # Convert the numeric TextBlob polarity score into a simple label.
+    # TextBlob polarity ranges from -1 to 1.
+    """Convert a TextBlob polarity score into a simple label."""
+    if polarity >= 0.1:
+        return "positive"
+    if polarity <= -0.1:
+        return "negative"
+    return "neutral"
+# 3. for wordcloud 
+def tokenize_words(text: str, stopwords: set[str]) -> list[str]:
+    # Step 6: Break the text into lowercase word tokens.
+    # We keep alphabetic words and allow apostrophes or hyphens inside them.
+    # Then we remove short words and stopwords.
+    """Make a simple list of lowercase words, excluding stopwords."""
+    tokens = re.findall(r"[A-Za-z][A-Za-z'-]+", text.lower())
+    return [
+        token
+        for token in tokens
+        if len(token) > 2 and token not in stopwords
+    ]
 
 # Send a browser-like identity to the website. We are pretending to be a browser.
 headers = {
-    "User-Agent": "Mozilla/5.0 (beginner text analysis tutorial)"
+    "User-Agent": "Mozilla/5.0 (i am impostor)"
 }
 
 # Download the ECB webpage.
@@ -89,10 +117,99 @@ text_path = DATA_DIR / "ecb_press_conference_2026-06-05.txt"
 # Converts it into machine-readable code and back correctly
 text_path.write_text(full_text, encoding="utf-8")
 
-# Print checks so we can check what happened.
-print("Saved text to:", text_path)
-print("Number of extracted text blocks:", len(text_blocks))
-print()
-print("Preview:")
-print(full_text[:800])
+# Sentiment analysis paragraph by paragraph
+paragraph_results = [] #create empty list to store results for each paragraph
 
+for i, paragraph in enumerate(text_blocks, 1):  # Start counting paragraphs starting from 1
+# enumerate = function that gives you both the index (i) and the value (paragraph) as it loops through text_blocks
+    blob = TextBlob(paragraph) # create textblob object for a paragraph
+    polarity = blob.sentiment.polarity # extract sentiment score from a paragraph
+
+    paragraph_results.append({
+        "paragraph_num": i,
+        "paragraph_text": paragraph, 
+        "polarity": polarity,
+        "subjectivity": blob.sentiment.subjectivity,
+        "sentiment_label": sentiment_label(polarity) #Converts the score to a word ("positive", "negative", or "neutral").
+    })
+
+# Save to CSV file
+df_paragraphs = pd.DataFrame(paragraph_results)
+sentiment_path = OUTPUT_DIR / "ecb_sentiment_summary.csv"
+df_paragraphs.to_csv(sentiment_path, index=False)
+
+# Start from the default English stopwords used by the wordcloud package.
+custom_stopwords = set(STOPWORDS)
+
+# Add domain-specific words that would otherwise dominate the figure.
+# These words are common in ECB texts, so removing them helps other themes stand out.
+custom_stopwords.update(
+    {
+        "ecb",
+        "euro",
+        "area",
+        "monetary",
+        "policy",
+        "inflation",
+        "per",
+        "cent",
+        "will",
+        "would",
+        "could",
+        "also",
+        "question",
+        "questions",
+        "answer",
+        "answers",
+        "think",
+        "going",
+    }
+)
+
+# Tokenize the clean text and remove stopwords.
+tokens = tokenize_words(full_text, custom_stopwords)
+
+# Count how often each remaining word appears.
+word_counts = Counter(tokens)
+
+# Save the top 30 words as a CSV table.
+top_words = pd.DataFrame(
+    word_counts.most_common(30),
+    columns=["word", "count"],
+)
+top_words_path = OUTPUT_DIR / "ecb_top_words.csv"
+top_words.to_csv(top_words_path, index=False)
+
+# Build the word cloud image from the full text.
+# The display settings control the size, colors, and reproducibility of the figure.
+wordcloud = WordCloud(
+    width=1200,
+    height=700,
+    background_color="white",
+    stopwords=custom_stopwords,
+    colormap="viridis",
+    random_state=42,
+).generate(full_text)
+
+# Choose the output path for the word cloud image.
+wordcloud_path = OUTPUT_DIR / "ecb_wordcloud.png"
+
+# Draw the word cloud with matplotlib and save it as a PNG file.
+plt.figure(figsize=(12, 7))
+plt.imshow(wordcloud, interpolation="bilinear")
+plt.axis("off")
+plt.tight_layout(pad=0)
+plt.savefig(wordcloud_path, dpi=200, bbox_inches="tight")
+plt.close()
+
+# Print a short summary so we can confirm all output files were created.
+print("Saved text to:", text_path)
+print("Saved paragraph sentiment analysis to:", sentiment_path)
+print("Saved top words table to:", top_words_path)
+print("Saved word cloud to:", wordcloud_path)
+print()
+print("All paragraphs by sentiment:")
+print(df_paragraphs[["paragraph_num", "polarity", "sentiment_label"]])
+print()
+print("Top 10 words after stopword removal:")
+print(top_words.head(10))

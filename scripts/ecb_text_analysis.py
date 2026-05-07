@@ -5,7 +5,7 @@ from collections import Counter
 # Counter helps to count how many times each item appears in a list or collection.
 import re
 # a Python module for working with text patterns, called regular expressions.
-# basically: search, match, and manipulate text in smart ways
+# basically: search, match, and manipulate text in smart ways, to find
 import requests
 # requests = a tool that lets Python access the internet like a browser.
 import pandas as pd
@@ -16,36 +16,40 @@ from bs4 import BeautifulSoup
 # Take a tool called BeautifulSoup from a library called bs4
 # BeautifulSoup = a tool that helps you read and extract data from websites easily
 from textblob import TextBlob
-from wordcloud import STOPWORDS, WordCloud
+from wordcloud import STOPWORDS, WordCloud # STOPWORDS = a list of words that are often removed from text analysis
 
 # Store the webpage address in a variable called URL
 URL = "https://www.ecb.europa.eu/press/press_conference/monetary-policy-statement/2025/html/ecb.is250605~f00a36ef2b.en.html"
 
-# Create folder paths for data and outputs
+# Create folder paths for data and outputs, DIR = directory/folder
 DATA_DIR = Path("data")
 OUTPUT_DIR = Path("outputs")
 
-# Create the folders if they do not already exist.
+# Create the folders if they do not already exist. mkdir = make directory
 DATA_DIR.mkdir(exist_ok=True)
 OUTPUT_DIR.mkdir(exist_ok=True)
 
-# Defining functions.
-# 1. Cleaning messy text
+# Defining my functions.
+# 1. For cleaning messy text
 def clean_whitespace(text: str) -> str:
     # HTML text can contain extra spaces, tabs, and line breaks.
     # This function turns repeated whitespace into a single clean space.
-    return re.sub(r"\s+", " ", text).strip() # \s means whitespace, + means “one or more”
-# 2. converts numbers into words for sentiment analysis
+    return re.sub(r"\s+", " ", text).strip() 
+    # return = Give back the answer, re = find, sub = substitute
+    # \s means whitespace, + means one or more
+# 2. For converting numbers into words for sentiment analysis
 def sentiment_label(polarity: float) -> str:
     # Convert the numeric TextBlob polarity score into a simple label.
     # TextBlob polarity ranges from -1 to 1.
-    """Convert a TextBlob polarity score into a simple label."""
     if polarity >= 0.1:
         return "positive"
     if polarity <= -0.1:
         return "negative"
     return "neutral"
-# 3. for wordcloud 
+    # self note: how does textblob determine polarity? 
+    # textblob has a dictionary built in. eg: love = positive (+1), hate = negative (-1), movie = neutral (0).
+    # Read each word, add up scores, average them = polarity number.
+# 3. For creating wordcloud
 def tokenize_words(text: str, stopwords: set[str]) -> list[str]:
     # Step 6: Break the text into lowercase word tokens.
     # We keep alphabetic words and allow apostrophes or hyphens inside them.
@@ -83,6 +87,7 @@ if section is None:
     raise RuntimeError("Could not find the article section. The page structure may have changed.")
 
 # Remove unwanted parts of a webpage in the analysis text.
+# a[href="#qa"] = Links that point to a question-and-answer section.
 for unwanted in section.select('script, style, a[href="#qa"], .ecb-publicationDate'):
     unwanted.decompose() # Deletes them completely from the page structure
 
@@ -166,7 +171,7 @@ custom_stopwords.update(
     }
 )
 
-# Tokenize the clean text and remove stopwords.
+# Tokenize the clean text and remove stopwords. tokenize = Break text into pieces.
 tokens = tokenize_words(full_text, custom_stopwords)
 
 # Count how often each remaining word appears.
@@ -181,14 +186,13 @@ top_words_path = OUTPUT_DIR / "ecb_top_words.csv"
 top_words.to_csv(top_words_path, index=False)
 
 # Build the word cloud image from the full text.
-# The display settings control the size, colors, and reproducibility of the figure.
 wordcloud = WordCloud(
     width=1200,
     height=700,
     background_color="white",
     stopwords=custom_stopwords,
     colormap="viridis",
-    random_state=42,
+    random_state=42, # Same result every time you run it.
 ).generate(full_text)
 
 # Choose the output path for the word cloud image.
